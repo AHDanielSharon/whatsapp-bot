@@ -1,34 +1,34 @@
-const { Client } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+import makeWASocket, { useMultiFileAuthState } from "@whiskeysockets/baileys"
+import P from "pino"
 
-const client = new Client({
-  puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-accelerated-2d-canvas",
-      "--no-first-run",
-      "--no-zygote",
-      "--single-process"
-    ]
-  }
-});
+async function startBot() {
 
-client.on('qr', (qr) => {
-  console.log("Scan this QR code:");
-  qrcode.generate(qr, { small: true });
-});
+const { state, saveCreds } = await useMultiFileAuthState("auth")
 
-client.on('ready', () => {
-  console.log("Bot is ready!");
-});
+const sock = makeWASocket({
+auth: state,
+printQRInTerminal: true,
+logger: P({ level: "silent" })
+})
 
-client.on('message', async msg => {
-  if (msg.body.toLowerCase() === "hi") {
-    msg.reply("Hello! WhatsApp bot is working.");
-  }
-});
+sock.ev.on("creds.update", saveCreds)
 
-client.initialize();
+sock.ev.on("messages.upsert", async ({ messages }) => {
+
+const msg = messages[0]
+
+if (!msg.message) return
+
+const text = msg.message.conversation || msg.message.extendedTextMessage?.text
+
+if (text?.toLowerCase() === "hi") {
+
+await sock.sendMessage(msg.key.remoteJid, { text: "Hello! WhatsApp bot working." })
+
+}
+
+})
+
+}
+
+startBot()
